@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Zentry - Edit EMI Plan</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins&display=swap" rel="stylesheet" />
+
+  <style>
+    body { font-family: 'Poppins', sans-serif; }
+  </style>
+</head>
+<body class="bg-gray-100 min-h-screen font-sans flex flex-col">
+
+  <div id="headerContainer" class="fixed top-0 left-0 right-0 z-50"></div>
+
+  <main class="flex-grow pt-28 px-4 flex flex-col items-center">
+
+    <h1 class="text-3xl font-bold text-center mb-6">Edit EMI Plan</h1>
+
+    <div class="bg-white shadow rounded p-6 max-w-md w-full">
+      <form id="emiForm" class="space-y-4">
+        <div>
+          <label for="name" class="block font-medium mb-1">Plan Name / Item</label>
+          <input type="text" id="name" class="w-full border rounded px-3 py-2" required />
+        </div>
+
+        <div>
+          <label for="purchaseDate" class="block font-medium mb-1">Purchase Date</label>
+          <input type="date" id="purchaseDate" class="w-full border rounded px-3 py-2" required />
+        </div>
+
+        <div>
+          <label for="amount" class="block font-medium mb-1">Product Amount (₹)</label>
+          <input type="number" id="amount" class="w-full border rounded px-3 py-2" min="0" step="0.01" required />
+        </div>
+
+        <div>
+          <label for="interest" class="block font-medium mb-1">Annual Interest Rate (%)</label>
+          <input type="number" id="interest" class="w-full border rounded px-3 py-2" min="0" max="100" step="0.01" required />
+        </div>
+
+        <div>
+          <label for="duration" class="block font-medium mb-1">Duration (months)</label>
+          <input type="number" id="duration" class="w-full border rounded px-3 py-2" min="1" required />
+        </div>
+
+        <div class="pt-4 flex gap-4">
+          <a href="View_EMI.html" class="w-1/2 text-center bg-gray-300 text-gray-800 py-2 px-4 rounded hover:bg-gray-400 transition">
+            ← Back
+          </a>
+          <button type="submit" class="w-1/2 bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 transition">
+            Save Changes
+          </button>
+        </div>
+      </form>
+    </div>
+  </main>
+
+  <!-- Confirmation Modal -->
+  <div id="confirmModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
+    <div class="bg-white rounded p-6 max-w-sm w-full shadow-lg text-center">
+      <p class="mb-4 text-lg font-semibold">Do you want to save the changes to this EMI plan?</p>
+      <div class="flex justify-center gap-4">
+        <button id="confirmYes" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition">Yes</button>
+        <button id="confirmNo" class="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition">No</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Success Modal -->
+  <div id="successModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
+    <div class="bg-white rounded p-6 max-w-xs w-full shadow-lg text-center">
+      <p class="text-green-600 font-semibold text-lg">EMI Plan updated successfully!</p>
+    </div>
+  </div>
+
+  <!-- Error Modal -->
+  <div id="errorModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
+    <div class="bg-white rounded p-6 max-w-xs w-full shadow-lg text-center">
+      <p class="text-red-600 font-semibold text-lg">Cancelled</p>
+    </div>
+  </div>
+
+  <script>
+    // Load header (same as your add page)
+    fetch('./Header.html')
+      .then(res => res.text())
+      .then(data => {
+        document.getElementById('headerContainer').innerHTML = data;
+
+        const menuToggle = document.getElementById('menuToggle');
+        const sidebarMenu = document.getElementById('sidebarMenu');
+
+        if (menuToggle && sidebarMenu) {
+          menuToggle.addEventListener('click', () => {
+            sidebarMenu.classList.toggle('hidden');
+          });
+        }
+
+        highlightSidebarItem();
+      });
+
+    function highlightSidebarItem() {
+      const sidebarMenu = document.getElementById('sidebarMenu');
+      if (!sidebarMenu) return;
+
+      const currentPage = window.location.pathname.split('/').pop();
+      const links = sidebarMenu.querySelectorAll('a');
+
+      links.forEach(link => {
+        const href = link.getAttribute('href');
+        link.classList.remove('text-yellow-400', 'font-semibold');
+
+        if (href === currentPage) {
+          link.classList.add('text-yellow-400', 'font-semibold');
+        }
+      });
+    }
+
+    function calculateEMI(P, annualRate, n) {
+      if (annualRate === 0) return P / n;
+      const r = annualRate / 12 / 100;
+      return P * r * Math.pow(1 + r, n) / (Math.pow(1 + r, n) - 1);
+    }
+
+    function generatePayments(startDate, amount, duration) {
+      const payments = [];
+      const date = new Date(startDate);
+
+      for (let i = 1; i <= duration; i++) {
+        const dueDate = new Date(date.getFullYear(), date.getMonth() + i, date.getDate());
+        payments.push({
+          installment: i,
+          dueDate: dueDate.toISOString().slice(0, 10),
+          amount,
+          paid: false,
+          paidDate: null
+        });
+      }
+
+      return payments;
+    }
+
+    // Helper to get URL param
+    function getQueryParam(param) {
+      const urlParams = new URLSearchParams(window.location.search);
+      return urlParams.get(param);
+    }
+
+    let emiIndex = null;
+    let originalEmi = null;
+
+    function loadEmi() {
+      emiIndex = getQueryParam('id');
+      if (emiIndex === null || emiIndex === '') {
+        alert('No EMI specified to edit.');
+        window.location.href = 'View_EMI.html';
+        return;
+      }
+      emiIndex = Number(emiIndex);
+
+      const emiPlans = JSON.parse(localStorage.getItem('emiPlans') || '[]');
+      if (!emiPlans[emiIndex]) {
+        alert('EMI Plan not found.');
+        window.location.href = 'View_EMI.html';
+        return;
+      }
+
+      originalEmi = emiPlans[emiIndex];
+
+      // Prefill form fields
+      document.getElementById('name').value = originalEmi.name;
+      document.getElementById('purchaseDate').value = originalEmi.purchaseDate;
+      document.getElementById('amount').value = originalEmi.amount;
+      document.getElementById('interest').value = originalEmi.interest;
+      document.getElementById('duration').value = originalEmi.duration;
+    }
+
+    document.getElementById('emiForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+
+      const name = document.getElementById('name').value.trim();
+      const purchaseDate = document.getElementById('purchaseDate').value;
+      const amount = parseFloat(document.getElementById('amount').value);
+      const interest = parseFloat(document.getElementById('interest').value);
+      const duration = parseInt(document.getElementById('duration').value);
+
+      if (!name || !purchaseDate || amount <= 0 || duration <= 0) {
+        showTemporaryMessage("Please fill all fields correctly.", "error");
+        return;
+      }
+
+      const confirmModal = document.getElementById('confirmModal');
+      confirmModal.classList.remove('hidden');
+
+      const confirmYes = document.getElementById('confirmYes');
+      const confirmNo = document.getElementById('confirmNo');
+
+      function cleanUp() {
+        confirmModal.classList.add('hidden');
+        confirmYes.removeEventListener('click', onYes);
+        confirmNo.removeEventListener('click', onNo);
+      }
+
+      function onYes() {
+        cleanUp();
+
+        // Recalculate EMI and payments
+        const emiAmount = calculateEMI(amount, interest, duration);
+        const payments = generatePayments(purchaseDate, emiAmount, duration);
+
+        // Update EMI plan object
+        const emiPlans = JSON.parse(localStorage.getItem('emiPlans') || '[]');
+        emiPlans[emiIndex] = {
+          ...emiPlans[emiIndex], // keep other data like status if any
+          name,
+          purchaseDate,
+          amount,
+          interest,
+          duration,
+          emiAmount,
+          payments,
+          status: 'ongoing'
+        };
+
+        localStorage.setItem('emiPlans', JSON.stringify(emiPlans));
+
+        const successModal = document.getElementById('successModal');
+        successModal.classList.remove('hidden');
+
+        setTimeout(() => {
+          successModal.classList.add('hidden');
+          window.location.href = "View_EMI.html";
+        }, 2000);
+      }
+
+      function onNo() {
+        cleanUp();
+
+        const errorModal = document.getElementById('errorModal');
+        errorModal.classList.remove('hidden');
+
+        setTimeout(() => {
+          errorModal.classList.add('hidden');
+        }, 2000);
+      }
+
+      confirmYes.addEventListener('click', onYes);
+      confirmNo.addEventListener('click', onNo);
+    });
+
+    function showTemporaryMessage(message, type = "error") {
+      const msgDiv = document.createElement('div');
+      msgDiv.textContent = message;
+      msgDiv.className = `
+        fixed top-16 left-1/2 -translate-x-1/2 px-6 py-3 rounded shadow-lg
+        text-white font-semibold z-50
+        ${type === "error" ? "bg-red-600" : "bg-green-600"}
+      `;
+      document.body.appendChild(msgDiv);
+
+      setTimeout(() => {
+        msgDiv.remove();
+      }, 3000);
+    }
+
+    // Load the EMI data when page loads
+    window.onload = loadEmi;
+  </script>
+</body>
+</html>

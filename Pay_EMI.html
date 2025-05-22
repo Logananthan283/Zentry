@@ -1,0 +1,261 @@
+<!-- Save as pay-emi.html -->
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Zentry - Pay EMI</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins&display=swap" rel="stylesheet" />
+  <script src="https://unpkg.com/feather-icons"></script>
+  <style>
+    body {
+      font-family: 'Poppins', sans-serif;
+    }
+    table {
+      table-layout: fixed;
+      width: 100%;
+      border-collapse: collapse;
+    }
+    th, td {
+      padding: 8px px;
+      text-align: center;
+      word-wrap: break-word;
+      white-space: normal;
+      border: 1px solid #d1d5db; /* Tailwind gray-300 */
+    }
+    .status-paid {
+      color: green;
+      font-weight: 600;
+    }
+    .status-unpaid {
+      color: red;
+      font-weight: 600;
+    }
+    input[type="date"] {
+      padding: 4px;
+      font-size: 0.875rem;
+      border-radius: 0.375rem;
+      border: 1px solid #d1d5db;
+      width: 140px;
+    }
+    button.pay-btn {
+      padding: 6px 12px;
+      background-color: #10b981; /* teal-500 */
+      color: white;
+      font-weight: 600;
+      border-radius: 0.375rem;
+      cursor: pointer;
+      transition: background-color 0.2s ease;
+      border: none;
+    }
+    button.pay-btn:hover {
+      background-color: #059669; /* teal-600 */
+    }
+    @media (max-width: 640px) {
+      h1 { font-size: 1.75rem; }
+      th, td { padding: 6px 4px; font-size: 0.75rem; }
+      input[type="date"] { width: 100px; }
+      button.pay-btn { padding: 4px 8px; font-size: 0.875rem; }
+    }
+  </style>
+</head>
+<body class="bg-gray-100 min-h-screen font-sans flex flex-col">
+
+  <!-- Header -->
+  <div id="headerContainer" class="fixed top-0 left-0 right-0 z-50"></div>
+
+  <!-- Main -->
+  <main class="flex-grow pt-28 px-4 max-w-5xl mx-auto w-full">
+    <h1 class="text-3xl font-bold text-center mb-6">Pay EMI</h1>
+
+    <!-- Plan Details -->
+    <div id="planDetails" class="bg-white shadow rounded p-6 mb-6">
+      <!-- Filled by JS -->
+    </div>
+
+    <!-- EMI Payment Table -->
+    <div class="bg-white shadow rounded p-6 overflow-x-auto">
+      <table>
+        <thead class="bg-gray-200">
+          <tr>
+            <th>Installment No.</th>
+            <th>Due Date</th>
+            <th>EMI Amount (₹)</th>
+            <th>Payment Status</th>
+            <th>Date of Payment</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="emiPaymentsBody"></tbody>
+      </table>
+    </div>
+
+    <!-- Back Button -->
+    <div class="flex justify-center mt-6 mb-12">
+      <a href="View_EMI.html" class="bg-gray-300 text-gray-800 py-3 px-8 rounded-md font-semibold hover:bg-gray-400 transition text-lg">
+        ← Back to EMI Plans
+      </a>
+    </div>
+  </main>
+
+  <script>
+    feather.replace();
+
+    // Helper to format date to yyyy-mm-dd
+    function formatDate(date) {
+      const d = new Date(date);
+      let month = '' + (d.getMonth() + 1);
+      let day = '' + d.getDate();
+      const year = d.getFullYear();
+
+      if (month.length < 2) month = '0' + month;
+      if (day.length < 2) day = '0' + day;
+
+      return [year, month, day].join('-');
+    }
+
+    // Add months to a date
+    function addMonths(date, months) {
+      const d = new Date(date);
+      d.setMonth(d.getMonth() + months);
+      return d;
+    }
+
+    // Load header.html
+    async function loadHeader() {
+      try {
+        const res = await fetch('./Header.html');
+        const html = await res.text();
+        document.getElementById('headerContainer').innerHTML = html;
+
+        const menuToggle = document.getElementById('menuToggle');
+        const sidebarMenu = document.getElementById('sidebarMenu');
+        if (menuToggle && sidebarMenu) {
+          menuToggle.addEventListener('click', () => sidebarMenu.classList.toggle('hidden'));
+          document.addEventListener('click', e => {
+            if (!sidebarMenu.contains(e.target) && !menuToggle.contains(e.target)) {
+              sidebarMenu.classList.add('hidden');
+            }
+          });
+          sidebarMenu.querySelectorAll('a').forEach(link => {
+            link.addEventListener('click', () => sidebarMenu.classList.add('hidden'));
+          });
+        }
+      } catch (err) {
+        console.error('Header load error:', err);
+      }
+    }
+    loadHeader();
+
+    // Parse query param plan index
+    const urlParams = new URLSearchParams(window.location.search);
+    const planIndex = Number(urlParams.get('plan'));
+
+    if (isNaN(planIndex)) {
+      alert('No EMI plan selected.');
+      window.location.href = 'View_EMI.html';
+    }
+
+    // Load plans from localStorage
+    const emiPlans = JSON.parse(localStorage.getItem('emiPlans') || '[]');
+    if (!emiPlans[planIndex]) {
+      alert('EMI plan not found.');
+      window.location.href = 'View_EMI.html';
+    }
+
+    const plan = emiPlans[planIndex];
+
+    // Load existing payment data or initialize empty array
+    // Stored as: emiPayments_<planIndex> = [{paid: true/false, paymentDate: "yyyy-mm-dd"}]
+    const storageKey = `emiPayments_${planIndex}`;
+    let emiPayments = JSON.parse(localStorage.getItem(storageKey) || '[]');
+
+    // Initialize emiPayments if not exist or shorter than duration
+    if (emiPayments.length !== plan.duration) {
+      emiPayments = [];
+      for (let i = 0; i < plan.duration; i++) {
+        emiPayments.push({ paid: false, paymentDate: '' });
+      }
+      localStorage.setItem(storageKey, JSON.stringify(emiPayments));
+    }
+
+    // Show plan details
+    function showPlanDetails() {
+      const container = document.getElementById('planDetails');
+      container.innerHTML = `
+        <h2 class="text-xl font-semibold mb-2">${plan.name}</h2>
+        <p><strong>Purchase Date:</strong> ${plan.purchaseDate}</p>
+        <p><strong>Principal Amount:</strong> ₹${Number(plan.amount).toLocaleString('en-IN')}</p>
+        <p><strong>Interest Rate:</strong> ${plan.interest}%</p>
+        <p><strong>Duration:</strong> ${plan.duration} months</p>
+        <p><strong>EMI Amount:</strong> ₹${Number(plan.emiAmount).toLocaleString('en-IN')}</p>
+      `;
+    }
+
+    // Render payments table rows
+    function renderPaymentsTable() {
+      const tbody = document.getElementById('emiPaymentsBody');
+      tbody.innerHTML = '';
+
+      const purchaseDateObj = new Date(plan.purchaseDate);
+      for (let i = 0; i < plan.duration; i++) {
+        const dueDate = addMonths(purchaseDateObj, i);
+        const dueDateStr = formatDate(dueDate);
+        const payment = emiPayments[i];
+
+        const tr = document.createElement('tr');
+
+        tr.innerHTML = `
+          <td data-label="S.No.">${i + 1}</td>
+          <td data-label="Due Date">${dueDateStr}</td>
+          <td data-label="EMI Amount (₹)">₹${Number(plan.emiAmount).toLocaleString('en-IN')}</td>
+          <td class="${payment.paid ? 'status-paid' : 'status-unpaid'}">${payment.paid ? 'Paid' : 'Unpaid'}</td>
+          <td>${payment.paymentDate || '-'}</td>
+          <td>
+            ${payment.paid
+              ? `<button class="pay-btn" data-index="${i}">Unpaid</button>`
+              : `<button class="pay-btn" data-index="${i}">Paid</button>
+                 <input type="date" data-index="${i}" class="payment-date-input" max="${formatDate(new Date())}" />`
+            }
+          </td>
+        `;
+
+        tbody.appendChild(tr);
+      }
+
+      // Attach event listeners to buttons & inputs
+      tbody.querySelectorAll('button.pay-btn').forEach(button => {
+        button.addEventListener('click', (e) => {
+          const idx = Number(e.target.getAttribute('data-index'));
+          if (emiPayments[idx].paid) {
+            // Mark unpaid
+            emiPayments[idx].paid = false;
+            emiPayments[idx].paymentDate = '';
+          } else {
+            // Mark paid only if date is selected
+            const dateInput = tbody.querySelector(`input.payment-date-input[data-index="${idx}"]`);
+            if (!dateInput || !dateInput.value) {
+              alert('Please select payment date before marking paid.');
+              return;
+            }
+            emiPayments[idx].paid = true;
+            emiPayments[idx].paymentDate = dateInput.value;
+          }
+          localStorage.setItem(storageKey, JSON.stringify(emiPayments));
+          renderPaymentsTable();
+        });
+      });
+
+      // Optionally, set today's date as default on inputs
+      tbody.querySelectorAll('input.payment-date-input').forEach(input => {
+        if (!input.value) input.value = formatDate(new Date());
+      });
+    }
+
+    // Initialize page
+    showPlanDetails();
+    renderPaymentsTable();
+  </script>
+</body>
+</html>

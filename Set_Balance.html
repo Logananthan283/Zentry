@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Zentry - Set Bank Balances</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Poppins&display=swap" rel="stylesheet" />
+
+  <style>
+    body {
+      font-family: 'Poppins', sans-serif;
+    }
+    /* Popup overlay */
+    #confirmationPopupOverlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      display: none; /* hidden by default */
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+    }
+    /* Popup box */
+    #confirmationPopup {
+      background: white;
+      padding: 1.5rem 2rem;
+      border-radius: 0.5rem;
+      max-width: 320px;
+      text-align: center;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    }
+    #confirmationPopup button {
+      min-width: 80px;
+    }
+  </style>
+</head>
+<body class="bg-gray-100 min-h-screen font-sans flex flex-col items-center justify-start pt-28 px-4">
+
+  <!-- Custom Popup Container (Success/Error) -->
+  <div id="customPopup" class="fixed top-16 left-1/2 transform -translate-x-1/2 bg-green-600 text-white px-6 py-3 rounded shadow-lg opacity-0 pointer-events-none transition-opacity duration-500 z-50"></div>
+
+  <!-- Confirmation Popup Overlay -->
+  <div id="confirmationPopupOverlay" class="flex">
+    <div id="confirmationPopup">
+      <p class="mb-6 text-lg font-semibold" id="confirmationMessage">Do you want to save the bank balances?</p>
+      <div class="flex justify-center gap-6">
+        <button id="confirmYes" class="bg-green-600 text-white py-2 px-4 rounded hover:bg-blue-700 transition">Yes</button>
+        <button id="confirmNo" class="bg-red-600 text-gray-700 py-2 px-4 rounded hover:bg-gray-400 transition">No</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Header Container -->
+  <div id="headerContainer" class="fixed top-0 left-0 right-0 z-50"></div>
+
+  <!-- Page Title -->
+  <h1 class="text-3xl font-bold text-center mb-6">Bank Balances</h1>
+
+  <!-- Export / Import Buttons -->
+  <div class="flex flex-wrap gap-4 my-6">
+    <button id="exportBankBtn" class="bg-blue-600 text-white px-4 py-2 rounded shadow hover:bg-blue-700 transition flex items-center gap-2">
+      <img src="icons/download.svg" alt="" class="w-5 h-5 filter invert" />
+      Export
+    </button>
+
+    <label for="importBankInput" class="bg-green-600 text-white px-4 py-2 rounded shadow hover:bg-green-700 transition flex items-center gap-2 cursor-pointer">
+      <img src="icons/upload.svg" alt="" class="w-5 h-5 filter invert" />
+      Import
+    </label>
+    <input type="file" id="importBankInput" accept=".csv" class="hidden" />
+  </div>
+
+  <!-- Form Container -->
+  <div class="bg-white shadow-md rounded p-6 w-full max-w-md">
+    <form id="balanceForm" class="space-y-4" novalidate>
+
+      <!-- State Bank of India -->
+      <div>
+        <label for="sbiBalance" class="block font-medium mb-1">State Bank of India</label>
+        <input type="number" id="sbiBalance" placeholder="Enter balance"
+          class="w-full border rounded px-3 py-2" min="0" step="0.01" />
+      </div>
+
+      <!-- Indian Bank -->
+      <div>
+        <label for="indianBalance" class="block font-medium mb-1">Indian Bank</label>
+        <input type="number" id="indianBalance" placeholder="Enter balance"
+          class="w-full border rounded px-3 py-2" min="0" step="0.01" />
+      </div>
+
+      <!-- Kotak Mahindra Bank -->
+      <div>
+        <label for="kotakBalance" class="block font-medium mb-1">Kotak Mahindra Bank</label>
+        <input type="number" id="kotakBalance" placeholder="Enter balance"
+          class="w-full border rounded px-3 py-2" min="0" step="0.01" />
+      </div>
+
+      <!-- Buttons -->
+      <div class="pt-4 flex gap-4">
+        <a href="Add_Credit_Transaction.html" class="w-1/2 text-center bg-gray-300 text-gray-800 py-2 px-4 rounded hover:bg-gray-400 transition">
+          ← Back
+        </a>
+        <button type="submit" class="w-1/2 bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 transition">
+          Save Balances
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <script>
+    // Load header
+    fetch('./Header.html')
+      .then(res => res.text())
+      .then(html => {
+        document.getElementById('headerContainer').innerHTML = html;
+
+        const menuToggle = document.getElementById('menuToggle');
+        const sidebarMenu = document.getElementById('sidebarMenu');
+        if (menuToggle && sidebarMenu) {
+          menuToggle.addEventListener('click', () => {
+            sidebarMenu.classList.toggle('hidden');
+          });
+        }
+
+        const currentPath = window.location.pathname.split("/").pop();
+        const links = sidebarMenu.querySelectorAll("a");
+        links.forEach(link => {
+          if (link.getAttribute("href") === currentPath) {
+            link.classList.add("bg-blue-500");
+          }
+        });
+      });
+
+    // Load balances on page load
+    window.addEventListener('DOMContentLoaded', () => {
+      const balances = JSON.parse(localStorage.getItem("bankBalances") || "{}");
+
+      if (balances["State Bank of India"] !== undefined) {
+        document.getElementById("sbiBalance").value = balances["State Bank of India"];
+      }
+      if (balances["Indian Bank"] !== undefined) {
+        document.getElementById("indianBalance").value = balances["Indian Bank"];
+      }
+      if (balances["Kotak Mahindra Bank"] !== undefined) {
+        document.getElementById("kotakBalance").value = balances["Kotak Mahindra Bank"];
+      }
+    });
+
+    // Elements
+    const balanceForm = document.getElementById('balanceForm');
+    const confirmationOverlay = document.getElementById('confirmationPopupOverlay');
+    const confirmationMessage = document.getElementById('confirmationMessage');
+    const confirmYesBtn = document.getElementById('confirmYes');
+    const confirmNoBtn = document.getElementById('confirmNo');
+    const customPopup = document.getElementById('customPopup');
+
+    let formData = null;
+
+    // Show popup function (top center green/red fade popup)
+    function showPopup(message, isError = false) {
+      customPopup.textContent = message;
+
+      if (isError) {
+        customPopup.classList.remove('bg-green-600');
+        customPopup.classList.add('bg-red-600');
+      } else {
+        customPopup.classList.remove('bg-red-600');
+        customPopup.classList.add('bg-green-600');
+      }
+
+      customPopup.style.opacity = '1';
+      customPopup.style.pointerEvents = 'auto';
+
+      setTimeout(() => {
+        customPopup.style.opacity = '0';
+        customPopup.style.pointerEvents = 'none';
+      }, 3000);
+    }
+
+    // On form submit, show confirmation popup
+    balanceForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+
+      // Collect inputs, convert to numbers or 0 if empty
+      const sbi = parseFloat(document.getElementById('sbiBalance').value) || 0;
+      const indian = parseFloat(document.getElementById('indianBalance').value) || 0;
+      const kotak = parseFloat(document.getElementById('kotakBalance').value) || 0;
+
+      // Validation: No negative values
+      if (sbi < 0 || indian < 0 || kotak < 0) {
+        showPopup('Balances cannot be negative.', true);
+        return;
+      }
+
+      formData = { sbi, indian, kotak };
+
+      confirmationMessage.textContent = "Do you want to save the bank balances?";
+      confirmationOverlay.style.display = 'flex';
+    });
+
+    // Confirm Yes: Save balances and close popup
+    confirmYesBtn.addEventListener('click', () => {
+      const balances = {
+        "State Bank of India": formData.sbi,
+        "Indian Bank": formData.indian,
+        "Kotak Mahindra Bank": formData.kotak
+      };
+      localStorage.setItem("bankBalances", JSON.stringify(balances));
+
+      confirmationOverlay.style.display = 'none';
+      showPopup("Bank balances saved successfully.");
+    });
+
+    // Confirm No: Close popup and show "Not saved" popup in red
+    confirmNoBtn.addEventListener('click', () => {
+      confirmationOverlay.style.display = 'none';
+      showPopup("Bank balances were not saved.", true);
+    });
+
+    // Export to CSV
+    document.getElementById('exportBankBtn').addEventListener('click', () => {
+      const balances = JSON.parse(localStorage.getItem("bankBalances") || "{}");
+      if (Object.keys(balances).length === 0) {
+        showPopup("No bank balances to export.", true);
+        return;
+      }
+      let csvContent = "Bank,Amount\n";
+      for (const bank in balances) {
+        csvContent += `${bank},${balances[bank]}\n`;
+      }
+      const blob = new Blob([csvContent], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "bank_balances.csv";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showPopup("Bank balances exported.");
+    });
+
+    // Import from CSV
+    document.getElementById('importBankInput').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        const text = evt.target.result;
+        const lines = text.trim().split('\n');
+
+        if (lines.length < 2) {
+          showPopup("Invalid CSV format.", true);
+          return;
+        }
+
+        const importedBalances = {};
+        for (let i = 1; i < lines.length; i++) {
+          const [bank, amount] = lines[i].split(',');
+          if (bank && !isNaN(amount)) {
+            importedBalances[bank.trim()] = parseFloat(amount.trim());
+          }
+        }
+
+        // Update input fields if keys exist
+        if (importedBalances["State Bank of India"] !== undefined) {
+          document.getElementById("sbiBalance").value = importedBalances["State Bank of India"];
+        }
+        if (importedBalances["Indian Bank"] !== undefined) {
+          document.getElementById("indianBalance").value = importedBalances["Indian Bank"];
+        }
+        if (importedBalances["Kotak Mahindra Bank"] !== undefined) {
+          document.getElementById("kotakBalance").value = importedBalances["Kotak Mahindra Bank"];
+        }
+
+        showPopup("Bank balances imported. Please save to apply.");
+        e.target.value = ""; // Reset input so same file can be re-imported
+      };
+      reader.readAsText(file);
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Zentry Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <link rel="manifest" href="manifest.json" />
+  <style>
+    body {
+      font-family: 'Poppins', sans-serif;
+    }
+    /* Modal background */
+    #customConfirmModal {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.6);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+    }
+    /* Modal box */
+    #customConfirmModal .modal-content {
+      background: white;
+      padding: 1.5rem 2rem;
+      border-radius: 0.5rem;
+      max-width: 400px;
+      text-align: center;
+      box-shadow: 0 0 10px rgba(0,0,0,0.25);
+    }
+    /* Buttons container */
+    #customConfirmModal .buttons {
+      margin-top: 1.5rem;
+      display: flex;
+      justify-content: center;
+      gap: 1rem;
+    }
+    /* Message popup */
+    #popupMessage {
+      position: fixed;
+      top: 1rem;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 1rem 2rem;
+      border-radius: 0.5rem;
+      color: white;
+      font-weight: 600;
+      font-size: 1rem;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+      z-index: 10000;
+    }
+    #popupMessage.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+  </style>
+</head>
+<body class="bg-gray-100 min-h-screen relative">
+
+  <!-- Header container -->
+  <div id="headerContainer"></div>
+
+  <!-- Main Content -->
+  <main class="p-4 sm:p-6 max-w-6xl mx-auto mt-6">
+
+    <!-- EMI Summary -->
+    <section id="summary" class="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
+      <div class="bg-white p-6 rounded shadow text-center">
+        <h2 class="text-lg font-semibold mb-2">Total EMIs</h2>
+        <p id="totalEmis" class="text-3xl font-bold break-words">0</p>
+      </div>
+      <div class="bg-white p-6 rounded shadow text-center">
+        <h2 class="text-lg font-semibold mb-2">Ongoing EMIs</h2>
+        <p id="ongoingEmis" class="text-3xl font-bold text-yellow-600 break-words">0</p>
+      </div>
+      <div class="bg-white p-6 rounded shadow text-center">
+        <h2 class="text-lg font-semibold mb-2">Completed EMIs</h2>
+        <p id="completedEmis" class="text-3xl font-bold text-green-600 break-words">0</p>
+      </div>
+    </section>
+
+    <!-- Pie Charts Section -->
+    <section class="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
+      <!-- Bank Balances Pie Chart -->
+      <div class="bg-white p-6 rounded shadow overflow-x-auto">
+        <h2 class="text-xl font-bold mb-4">Bank Balances</h2>
+        <canvas id="bankPieChart" width="400" height="400" class="max-w-full h-auto"></canvas>
+      </div>
+
+      <!-- Transactions Pie Chart -->
+      <div class="bg-white p-6 rounded shadow overflow-x-auto">
+        <h2 class="text-xl font-bold mb-4">Transactions by Payment Method</h2>
+        <canvas id="transPieChart" width="400" height="400" class="max-w-full h-auto"></canvas>
+      </div>
+
+      <!-- EMI Pie Chart -->
+      <div class="bg-white p-6 rounded shadow overflow-x-auto">
+        <h2 class="text-xl font-bold mb-4">EMI Paid by Product</h2>
+        <canvas id="emiPieChart" width="400" height="400" class="max-w-full h-auto"></canvas>
+      </div>
+
+      <a href="javascript:void(0);" id="downloadTransactionsBtn" class="block w-full text-center bg-gray-300 text-gray-800 py-2 px-4 rounded hover:bg-gray-400 transition">
+        Download Transaction
+      </a>
+      <button id="clearStorageBtn" class="block w-full text-center bg-red-600 text-white py-2 px-4 rounded hover:bg-red-700 transition mt-2">
+        Clear All Data
+      </button>
+    </section>
+  </main>
+
+  <!-- Custom Confirmation Modal -->
+  <div id="customConfirmModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal-content">
+      <h3 id="modalTitle" class="text-xl font-semibold">Confirm Action</h3>
+      <p class="mt-4">Are you sure you want to clear all data? This action cannot be undone.</p>
+      <div class="buttons">
+        <button id="confirmYesBtn" class="bg-green-600 hover:bg-green-600 text-white font-bold py-2 px-6 rounded transition">Yes</button>
+        <button id="confirmNoBtn" class="bg-red-600 hover:bg-red-600 text-white font-bold py-2 px-6 rounded transition">No</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Popup Message -->
+  <div id="popupMessage"></div>
+
+  <!-- Header Script -->
+  <script>
+    fetch('./Header.html')
+      .then(response => {
+        if (!response.ok) throw new Error('Failed to load header');
+        return response.text();
+      })
+      .then(html => {
+        document.getElementById('headerContainer').innerHTML = html;
+        const menuToggle = document.getElementById('menuToggle');
+        const sidebarMenu = document.getElementById('sidebarMenu');
+
+        if (menuToggle && sidebarMenu) {
+          menuToggle.addEventListener('click', () => {
+            sidebarMenu.classList.toggle('hidden');
+          });
+        }
+
+        const links = document.querySelectorAll('#sidebarMenu a');
+        links.forEach(link => {
+          const linkPath = new URL(link.href).pathname.split('/').pop();
+          const currentPath = window.location.pathname.split('/').pop();
+          if (linkPath === currentPath) {
+            link.classList.add('text-yellow-300', 'font-bold');
+            link.classList.remove('text-white');
+          }
+        });
+      })
+      .catch(err => console.error(err));
+  </script>
+
+  <!-- Dashboard Script -->
+  <script>
+    const totalEmisElem = document.getElementById('totalEmis');
+    const ongoingEmisElem = document.getElementById('ongoingEmis');
+    const completedEmisElem = document.getElementById('completedEmis');
+
+    const emiCtx = document.getElementById('emiPieChart').getContext('2d');
+    const transCtx = document.getElementById('transPieChart').getContext('2d');
+    const bankCtx = document.getElementById('bankPieChart').getContext('2d');
+
+    let emiPieChart = null;
+    let transPieChart = null;
+    let bankPieChart = null;
+
+    function loadEMIData() {
+      const emiPlans = JSON.parse(localStorage.getItem('emiPlans') || '[]');
+      const total = emiPlans.length;
+      const ongoing = emiPlans.filter(p => p.status === 'ongoing').length;
+      const completed = emiPlans.filter(p => p.status === 'completed').length;
+
+      totalEmisElem.textContent = total;
+      ongoingEmisElem.textContent = ongoing;
+      completedEmisElem.textContent = completed;
+
+      return { emiPlans };
+    }
+
+    function loadTransactionData() {
+      const transactions = JSON.parse(localStorage.getItem('transactions') || '[]');
+      const allowedMethods = ["UPI", "Bank Transfer", "Debit Card"];
+      const methodCount = {};
+
+      transactions.forEach(t => {
+        const method = t.method?.trim();
+        if (allowedMethods.includes(method)) {
+          methodCount[method] = (methodCount[method] || 0) + 1;
+        }
+      });
+
+      return methodCount;
+    }
+
+    function loadBankBalanceData() {
+      const bankBalances = JSON.parse(localStorage.getItem('bankBalances') || '{}');
+
+      // ❌ Remove 'sbi' entry if present
+      delete bankBalances['sbi'];
+
+      return bankBalances;
+    }
+
+    function createEmiPieChartByProduct(emiPlans) {
+      if (emiPieChart) emiPieChart.destroy();
+
+      const productTotals = {};
+      emiPlans.forEach(plan => {
+        if (!productTotals[plan.name]) productTotals[plan.name] = 0;
+        if (plan.payments?.length) {
+          plan.payments.forEach(payment => {
+            productTotals[plan.name] += payment.amount ?? plan.emiAmount;
+          });
+        } else {
+          productTotals[plan.name] += plan.emiAmount;
+        }
+      });
+
+      const labels = Object.keys(productTotals);
+      const data = Object.values(productTotals);
+      const colors = labels.map(() => `rgb(${150 + Math.random() * 100},${150 + Math.random() * 100},${150 + Math.random() * 100})`);
+
+      emiPieChart = new Chart(emiCtx, {
+        type: 'pie',
+        data: {
+          labels: labels.length ? labels : ['No EMI Data'],
+          datasets: [{
+            data: data.length ? data : [1],
+            backgroundColor: data.length ? colors : ['#9ca3af']
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: { legend: { position: 'bottom' } }
+        }
+      });
+    }
+
+    function createTransactionPieChart(typeCount) {
+      if (transPieChart) transPieChart.destroy();
+
+      const labels = Object.keys(typeCount);
+      const data = Object.values(typeCount);
+      const colors = labels.map(() => `rgb(${150 + Math.random() * 100},${150 + Math.random() * 100},${150 + Math.random() * 100})`);
+
+      transPieChart = new Chart(transCtx, {
+        type: 'pie',
+        data: {
+          labels: labels.length ? labels : ['No Transactions'],
+          datasets: [{
+            data: data.length ? data : [1],
+            backgroundColor: data.length ? colors : ['#9ca3af']
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: { legend: { position: 'bottom' } }
+        }
+      });
+    }
+
+    function createBankBalancePieChart(bankData) {
+      if (bankPieChart) bankPieChart.destroy();
+
+      const labels = Object.keys(bankData);
+      const data = Object.values(bankData);
+      const colors = labels.map(() => `rgb(${100 + Math.random() * 155},${100 + Math.random() * 155},${100 + Math.random() * 155})`);
+
+      bankPieChart = new Chart(bankCtx, {
+        type: 'pie',
+        data: {
+          labels: labels.length ? labels : ['No Bank Data'],
+          datasets: [{
+            data: data.length ? data : [1],
+            backgroundColor: data.length ? colors : ['#9ca3af']
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: { legend: { position: 'bottom' } }
+        }
+      });
+    }
+
+    function updateDashboard() {
+      const { emiPlans } = loadEMIData();
+      createEmiPieChartByProduct(emiPlans);
+
+      const transactionCounts = loadTransactionData();
+      createTransactionPieChart(transactionCounts);
+
+      const bankData = loadBankBalanceData();
+      createBankBalancePieChart(bankData);
+    }
+
+    // Download Transactions as XLSX
+    document.getElementById('downloadTransactionsBtn').addEventListener('click', () => {
+      const transactions = JSON.parse(localStorage.getItem('transactions') || '[]');
+      if (!transactions.length) {
+        showPopupMessage('No transaction data to download.', 'red');
+        return;
+      }
+
+      // Filter only transactions with method UPI, Bank Transfer, Debit Card (expense)
+      const allowedMethods = ["UPI", "Bank Transfer", "Debit Card"];
+      const filteredTrans = transactions.filter(t => allowedMethods.includes(t.method?.trim()));
+
+      if (!filteredTrans.length) {
+        showPopupMessage('No matching expense transactions found.', 'red');
+        return;
+      }
+
+      // Prepare worksheet data
+      const wsData = [
+        ["Date", "Amount", "Type", "Payment Method", "Description"]
+      ];
+
+      filteredTrans.forEach(t => {
+        wsData.push([
+          t.date || '',
+          t.amount || '',
+          t.type || '',
+          t.method || '',
+          t.description || ''
+        ]);
+      });
+
+      const ws = XLSX.utils.aoa_to_sheet(wsData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Transactions");
+
+      XLSX.writeFile(wb, "Zentry_Transactions.xlsx");
+    });
+
+    // Show popup message helper
+    const popupMessage = document.getElementById('popupMessage');
+    let popupTimeout = null;
+    function showPopupMessage(message, color = 'green') {
+      popupMessage.textContent = message;
+      popupMessage.style.backgroundColor = color === 'green' ? '#22c55e' : '#ef4444';
+      popupMessage.classList.add('show');
+
+      if (popupTimeout) clearTimeout(popupTimeout);
+      popupTimeout = setTimeout(() => {
+        popupMessage.classList.remove('show');
+      }, 3000);
+    }
+
+    // Custom Confirm Modal Elements
+    const customConfirmModal = document.getElementById('customConfirmModal');
+    const confirmYesBtn = document.getElementById('confirmYesBtn');
+    const confirmNoBtn = document.getElementById('confirmNoBtn');
+
+    // Clear All Data button click
+    document.getElementById('clearStorageBtn').addEventListener('click', () => {
+      customConfirmModal.style.display = 'flex';
+    });
+
+    // Confirm Yes button
+    confirmYesBtn.addEventListener('click', () => {
+      localStorage.clear();
+      customConfirmModal.style.display = 'none';
+      updateDashboard();
+      showPopupMessage('All data cleared successfully!', 'green');
+    });
+
+    // Confirm No button
+    confirmNoBtn.addEventListener('click', () => {
+      customConfirmModal.style.display = 'none';
+      showPopupMessage('No Data Are Cleared.', 'red');
+    });
+
+    // Close modal if click outside content
+    customConfirmModal.addEventListener('click', (e) => {
+      if (e.target === customConfirmModal) {
+        customConfirmModal.style.display = 'none';
+        showPopupMessage('No Data Are Cleared.', 'red');
+      }
+    });
+
+    // Initial load
+    updateDashboard();
+  </script>
+</body>
+</html>
