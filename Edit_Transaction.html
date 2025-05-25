@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Zentry - Edit Debit Transaction</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins&display=swap" rel="stylesheet" />
+  <style>
+    body { font-family: 'Poppins', sans-serif; }
+    .fade-in { animation: fadeIn 0.3s ease-in-out; }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: scale(0.95); }
+      to { opacity: 1; transform: scale(1); }
+    }
+  </style>
+</head>
+<body class="bg-gray-100 min-h-screen font-sans flex flex-col">
+
+  <!-- Header -->
+  <div id="headerContainer" class="fixed top-0 left-0 right-0 z-50"></div>
+
+  <!-- Main content -->
+  <main class="flex-grow pt-28 px-4 flex flex-col items-center">
+    <h1 class="text-3xl font-bold text-center mb-6">Edit Debit Transaction</h1>
+
+    <div class="bg-white shadow rounded p-6 max-w-md w-full">
+      <form id="editTransactionForm" class="space-y-4" onsubmit="confirmEdit(event)">
+        <!-- Bank -->
+        <div>
+          <label for="bank" class="block font-medium mb-1">Select Bank</label>
+          <select id="bank" required onchange="updatePaymentOptions()" class="w-full border rounded px-3 py-2">
+            <option value="" disabled selected>-- Choose Bank --</option>
+            <option value="State Bank of India">State Bank of India</option>
+            <option value="Indian Bank">Indian Bank</option>
+            <option value="Kotak Mahindra Bank">Kotak Mahindra Bank</option>
+          </select>
+        </div>
+
+        <!-- Payment Method -->
+        <div>
+          <label for="method" class="block font-medium mb-1">Payment Method</label>
+          <select id="method" required class="w-full border rounded px-3 py-2">
+            <option value="" disabled selected>-- Choose Method --</option>
+          </select>
+        </div>
+
+        <!-- Amount -->
+        <div>
+          <label for="amount" class="block font-medium mb-1">Amount (₹)</label>
+          <input type="number" id="amount" min="1" step="0.01" required class="w-full border rounded px-3 py-2" />
+        </div>
+
+        <!-- Notes -->
+        <div>
+          <label for="notes" class="block font-medium mb-1">Notes (optional)</label>
+          <textarea id="notes" rows="3" class="w-full border rounded px-3 py-2"></textarea>
+        </div>
+
+        <!-- Buttons -->
+        <div class="pt-4 flex gap-4">
+          <a href="View_Transactions.html" class="w-1/2 text-center bg-gray-300 text-gray-800 py-2 px-4 rounded hover:bg-gray-400 transition">← Cancel</a>
+          <button type="submit" class="w-1/2 bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 transition">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </main>
+
+<!-- Success Popup -->
+<div id="successPopup" class="fixed inset-0 hidden flex items-center justify-center bg-black bg-opacity-50 z-50">
+  <div class="bg-white rounded-lg p-6 max-w-sm w-full text-center shadow-lg fade-in">
+    <p class="text-green-600 font-semibold text-lg">Transaction updated successfully!</p>
+  </div>
+</div>
+
+<!-- Error Popup -->
+<div id="errorPopup" class="fixed inset-0 hidden flex items-center justify-center bg-black bg-opacity-50 z-50">
+  <div class="bg-white rounded-lg p-6 max-w-sm w-full text-center shadow-lg fade-in">
+    <p id="errorMessage" class="text-red-600 font-semibold text-lg"></p>
+  </div>
+</div>
+
+<!-- Confirmation Popup -->
+<div id="confirmPopup" class="fixed inset-0 hidden flex items-center justify-center bg-black bg-opacity-50 z-50">
+  <div class="bg-white rounded-lg p-6 max-w-sm w-full text-center shadow-lg fade-in">
+    <p class="text-gray-800 font-semibold text-lg mb-4">Are you sure you want to save changes?</p>
+    <div class="flex justify-center gap-4">
+      <button onclick="executeSave()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded">Yes</button>
+      <button onclick="closePopup('confirmPopup')" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded">No</button>
+    </div>
+  </div>
+</div>
+
+
+  <script>
+    const bankPaymentOptions = {
+      "State Bank of India": ["UPI", "Bank Transfer", "Debit Card"],
+      "Indian Bank": ["UPI", "Bank Transfer", "Debit Card"],
+      "Kotak Mahindra Bank": ["UPI", "Bank Transfer", "Debit Card"]
+    };
+
+    function updatePaymentOptions() {
+      const bank = document.getElementById("bank").value;
+      const method = document.getElementById("method");
+      method.innerHTML = '<option value="" disabled selected>-- Choose Method --</option>';
+      if (bankPaymentOptions[bank]) {
+        bankPaymentOptions[bank].forEach(opt => {
+          const option = document.createElement("option");
+          option.value = opt;
+          option.textContent = opt;
+          method.appendChild(option);
+        });
+      }
+    }
+
+    function getQueryParam(param) {
+      const urlParams = new URLSearchParams(window.location.search);
+      return urlParams.get(param);
+    }
+
+    let transactionIndex = null;
+    let originalTransaction = null;
+
+    fetch('./Header.html')
+      .then(res => res.text())
+      .then(html => {
+        document.getElementById('headerContainer').innerHTML = html;
+        const menuToggle = document.getElementById('menuToggle');
+        const sidebarMenu = document.getElementById('sidebarMenu');
+        if (menuToggle && sidebarMenu) {
+          menuToggle.addEventListener('click', () => {
+            sidebarMenu.classList.toggle('hidden');
+          });
+        }
+      })
+      .finally(() => {
+        loadTransaction();
+      });
+
+    function loadTransaction() {
+      transactionIndex = getQueryParam('id');
+      if (transactionIndex === null) {
+        showErrorMessage("No transaction specified to edit.");
+        return setTimeout(() => window.location.href = "View_Transactions.html", 1500);
+      }
+
+      const transactions = JSON.parse(localStorage.getItem('transactions')) || [];
+      if (!transactions[transactionIndex]) {
+        showErrorMessage("Transaction not found.");
+        return setTimeout(() => window.location.href = "View_Transactions.html", 1500);
+      }
+
+      originalTransaction = transactions[transactionIndex];
+      document.getElementById('bank').value = originalTransaction.bank;
+      updatePaymentOptions();
+
+      setTimeout(() => {
+        document.getElementById('method').value = originalTransaction.method;
+      }, 0);
+
+      document.getElementById('amount').value = originalTransaction.amount;
+      document.getElementById('notes').value = originalTransaction.notes || '';
+    }
+
+    function confirmEdit(event) {
+      event.preventDefault();
+      const bank = document.getElementById('bank').value;
+      const method = document.getElementById('method').value;
+      const amount = parseFloat(document.getElementById('amount').value);
+
+      if (!bank || !method || isNaN(amount) || amount <= 0) {
+        showErrorMessage("Please fill out all fields correctly.");
+        return;
+      }
+
+      // Show confirmation popup
+      document.getElementById('confirmPopup').classList.remove('hidden');
+    }
+
+    function executeSave() {
+      closePopup('confirmPopup');
+
+      const bank = document.getElementById('bank').value;
+      const method = document.getElementById('method').value;
+      const amount = parseFloat(document.getElementById('amount').value);
+      const notes = document.getElementById('notes').value.trim();
+
+      let transactions = JSON.parse(localStorage.getItem('transactions')) || [];
+      let balances = JSON.parse(localStorage.getItem('bankBalances')) || {};
+
+      if (originalTransaction.bank in balances) {
+        balances[originalTransaction.bank] += originalTransaction.amount;
+      }
+
+      if (bank in balances) {
+        balances[bank] -= amount;
+      } else {
+        balances[bank] = -amount;
+      }
+
+      transactions[transactionIndex] = {
+        ...transactions[transactionIndex],
+        bank,
+        method,
+        amount,
+        notes,
+        date: new Date().toLocaleString()
+      };
+
+      localStorage.setItem('transactions', JSON.stringify(transactions));
+      localStorage.setItem('bankBalances', JSON.stringify(balances));
+
+      showSuccessMessage("Transaction updated successfully!");
+    }
+
+    function closePopup(id) {
+      document.getElementById(id).classList.add('hidden');
+    }
+
+    function showSuccessMessage(msg) {
+      const popup = document.getElementById('successPopup');
+      popup.querySelector('p').textContent = msg;
+      popup.classList.remove('hidden');
+      setTimeout(() => {
+        popup.classList.add('hidden');
+        window.location.href = 'View_Transactions.html';
+      }, 1500);
+    }
+
+    function showErrorMessage(msg) {
+      const popup = document.getElementById('errorPopup');
+      document.getElementById('errorMessage').textContent = msg;
+      popup.classList.remove('hidden');
+      setTimeout(() => popup.classList.add('hidden'), 2000);
+    }
+  </script>
+
+</body>
+</html>

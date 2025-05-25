@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Zentry - Add Debit Transaction</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins&display=swap" rel="stylesheet" />
+  <style>
+    body {
+      font-family: 'Poppins', sans-serif;
+    }
+  </style>
+</head>
+<body class="bg-gray-100 min-h-screen font-sans flex flex-col">
+
+  <!-- Header Container -->
+  <div id="headerContainer" class="fixed top-0 left-0 right-0 z-50"></div>
+
+  <!-- Main content -->
+  <main class="flex-grow pt-28 px-4 flex flex-col items-center">
+    <h1 class="text-3xl font-bold text-center mb-6">Add Debit Transaction</h1>
+
+    <div class="bg-white shadow rounded p-6 max-w-md w-full">
+      <form id="transactionForm" class="space-y-4" onsubmit="handleSubmit(event)">
+        <!-- Bank -->
+        <div>
+          <label for="bank" class="block font-medium mb-1">Select Bank</label>
+          <select id="bank" required onchange="updatePaymentOptions()" class="w-full border rounded px-3 py-2">
+            <option value="" disabled selected>-- Choose Bank --</option>
+            <option value="State Bank of India">State Bank of India</option>
+            <option value="Indian Bank">Indian Bank</option>
+            <option value="Kotak Mahindra Bank">Kotak Mahindra Bank</option>
+          </select>
+        </div>
+
+        <!-- Payment Method -->
+        <div>
+          <label for="method" class="block font-medium mb-1">Payment Method</label>
+          <select id="method" required class="w-full border rounded px-3 py-2">
+            <option value="" disabled selected>-- Choose Method --</option>
+          </select>
+        </div>
+
+        <!-- Amount -->
+        <div>
+          <label for="amount" class="block font-medium mb-1">Amount (₹)</label>
+          <input type="number" id="amount" min="1" step="0.01" placeholder="Enter amount" required class="w-full border rounded px-3 py-2" />
+        </div>
+
+        <!-- Notes -->
+        <div>
+          <label for="notes" class="block font-medium mb-1">Notes (optional)</label>
+          <textarea id="notes" rows="3" placeholder="Reason or details..." class="w-full border rounded px-3 py-2"></textarea>
+        </div>
+
+        <!-- Buttons -->
+        <div class="pt-4 flex gap-4">
+          <a href="index.html" class="w-1/2 text-center bg-gray-300 text-gray-800 py-2 px-4 rounded hover:bg-gray-400 transition">
+            ← Back
+          </a>
+          <button type="submit" class="w-1/2 bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 transition">
+            Save
+          </button>
+        </div>
+      </form>
+    </div>
+  </main>
+
+  <!-- Confirmation Popup -->
+  <div id="confirmPopup" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 hidden z-50">
+    <div class="bg-white rounded-lg p-6 max-w-sm w-full text-center shadow-lg">
+      <p class="text-gray-800 font-semibold text-lg mb-6">Are you sure you want to save this debit transaction?</p>
+      <div class="flex justify-center gap-6">
+        <button id="confirmYes" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-6 rounded transition">
+          Yes
+        </button>
+        <button id="confirmNo" class="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-6 rounded transition">
+          No
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Result Popup -->
+  <div id="resultPopup" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 hidden z-50">
+    <div class="bg-white rounded-lg p-6 max-w-sm w-full text-center shadow-lg">
+      <p id="resultMessage" class="text-lg font-semibold mb-2"></p>
+    </div>
+  </div>
+
+  <!-- Script -->
+  <script>
+    // Load header
+    fetch('./Header.html')
+      .then(res => res.text())
+      .then(html => {
+        document.getElementById('headerContainer').innerHTML = html;
+
+        const menuToggle = document.getElementById('menuToggle');
+        const sidebarMenu = document.getElementById('sidebarMenu');
+
+        if (menuToggle && sidebarMenu) {
+          menuToggle.addEventListener('click', () => {
+            sidebarMenu.classList.toggle('hidden');
+          });
+
+          const currentPath = window.location.pathname.split("/").pop();
+          const links = sidebarMenu.querySelectorAll("a");
+          links.forEach(link => {
+            if (link.getAttribute("href") === currentPath) {
+              link.classList.add("bg-blue-500");
+            }
+          });
+        }
+      });
+
+    // Bank to Payment Method options
+    const bankPaymentOptions = {
+      "State Bank of India": ["UPI", "Bank Transfer", "Debit Card"],
+      "Indian Bank": ["UPI", "Bank Transfer", "Debit Card"],
+      "Kotak Mahindra Bank": ["UPI", "Bank Transfer", "Debit Card"]
+    };
+
+    function updatePaymentOptions() {
+      const bank = document.getElementById("bank").value;
+      const method = document.getElementById("method");
+
+      method.innerHTML = '<option value="" disabled selected>-- Choose Method --</option>';
+      if (bankPaymentOptions[bank]) {
+        bankPaymentOptions[bank].forEach(opt => {
+          const option = document.createElement("option");
+          option.value = opt;
+          option.textContent = opt;
+          method.appendChild(option);
+        });
+      }
+    }
+
+    const confirmPopup = document.getElementById("confirmPopup");
+    const resultPopup = document.getElementById("resultPopup");
+    const resultMessage = document.getElementById("resultMessage");
+
+    function handleSubmit(event) {
+      event.preventDefault();
+      const bank = document.getElementById('bank').value;
+      const method = document.getElementById('method').value;
+      const amount = parseFloat(document.getElementById('amount').value);
+
+      if (!bank || !method || isNaN(amount) || amount <= 0) {
+        alert("Please fill out all fields correctly.");
+        return;
+      }
+
+      confirmPopup.classList.remove("hidden");
+    }
+
+    document.getElementById("confirmNo").addEventListener("click", () => {
+      confirmPopup.classList.add("hidden");
+      resultMessage.textContent = "Transaction was not saved.";
+      resultMessage.className = "text-red-600 text-lg font-semibold mb-2";
+      resultPopup.classList.remove("hidden");
+
+      setTimeout(() => {
+        resultPopup.classList.add("hidden");
+      }, 1000);
+    });
+
+    document.getElementById("confirmYes").addEventListener("click", () => {
+      confirmPopup.classList.add("hidden");
+      saveDebitTransaction();
+    });
+
+    function saveDebitTransaction() {
+      const bank = document.getElementById('bank').value;
+      const method = document.getElementById('method').value;
+      const amount = parseFloat(document.getElementById('amount').value);
+      const notes = document.getElementById('notes').value.trim();
+
+      const transaction = {
+        type: "debit",
+        bank,
+        method,
+        amount,
+        notes,
+        date: new Date().toLocaleString()
+      };
+
+      let transactions = JSON.parse(localStorage.getItem("transactions")) || [];
+      transactions.push(transaction);
+      localStorage.setItem("transactions", JSON.stringify(transactions));
+
+      let balances = JSON.parse(localStorage.getItem("bankBalances")) || {};
+      if (!(bank in balances)) balances[bank] = 0;
+      balances[bank] -= amount;
+      localStorage.setItem("bankBalances", JSON.stringify(balances));
+
+      // Show success message
+      resultMessage.textContent = "Transaction saved successfully!";
+      resultMessage.className = "text-green-600 text-lg font-semibold mb-2";
+      resultPopup.classList.remove("hidden");
+
+      // After 1.5 seconds, hide the message and redirect
+      setTimeout(() => {
+        resultPopup.classList.add("hidden");
+        window.location.href = "View_Transactions.html";
+      }, 1500);
+
+      // Reset form
+      document.getElementById('transactionForm').reset();
+      document.getElementById("method").innerHTML = '<option value="" disabled selected>-- Choose Method --</option>';
+    }
+  </script>
+</body>
+</html>

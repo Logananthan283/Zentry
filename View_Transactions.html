@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en" >
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>View Transactions - Zentry</title>
+
+  <!-- Poppins font -->
+  <link href="https://fonts.googleapis.com/css2?family=Poppins&display=swap" rel="stylesheet" />
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <style>
+    body {
+      font-family: 'Poppins', sans-serif;
+    }
+
+    main {
+      max-width: 900px;
+      margin-left: auto;
+      margin-right: auto;
+      padding: 1.5rem 1rem 3rem;
+    }
+
+    .table-wrapper {
+      background-color: white;
+      box-shadow: 0 1px 4px rgb(0 0 0 / 0.1);
+      border-radius: 0.5rem;
+      padding: 1.5rem;
+      overflow-x: auto;
+      border: none !important;
+    }
+
+    table {
+      table-layout: fixed;
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 700px;
+    }
+
+    th, td {
+      padding: 12px 12px;
+      text-align: center;
+      word-wrap: break-word;
+      white-space: normal;
+      vertical-align: middle;
+      border: 1px solid #d1d5db;
+    }
+
+    thead th {
+      background-color: #e5e7eb;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    tbody tr:hover {
+      background-color: #f9fafb;
+    }
+
+    h1 {
+      font-weight: 600;
+      font-size: 1.875rem;
+      color: #111827;
+      margin-bottom: 1.5rem;
+      letter-spacing: 0.05em;
+      text-align: center;
+    }
+
+    #exportBtn, label[for="importInput"] {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 600;
+      user-select: none;
+      padding: 0.5rem 1rem;
+      border-radius: 0.375rem;
+      cursor: pointer;
+      font-size: 1rem;
+      transition: background-color 0.2s ease;
+      box-shadow: 0 1px 3px rgb(0 0 0 / 0.1);
+      border: none;
+    }
+    #exportBtn {
+      background-color: #3176f5;
+      color: #fafafa;
+    }
+    #exportBtn:hover {
+      background-color: #f59e0b;
+      color: #ffffff;
+    }
+    label[for="importInput"] {
+      background-color: #16a34a;
+      color: white;
+    }
+    label[for="importInput"]:hover {
+      background-color: #15803d;
+    }
+    #exportBtn img, label[for="importInput"] img {
+      width: 20px;
+      height: 20px;
+      display: block;
+      filter: brightness(0) invert(1);
+    }
+
+    .btn-nav-container {
+      max-width: 900px;
+      margin: 1.5rem auto 3rem;
+      padding: 0 1rem;
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .btn-nav-container a {
+      flex: 1 1 45%;
+      text-align: center;
+      font-size: 1rem;
+      font-weight: 600;
+      padding: 0.6rem 0;
+      border-radius: 0.375rem;
+      background-color: #d1d5db;
+      color: #374151;
+      transition: background-color 0.2s ease;
+      text-decoration: none;
+      user-select: none;
+    }
+
+    .btn-nav-container a:hover {
+      background-color: #9ca3af;
+    }
+
+    .action-btns {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      align-items: center;
+      flex-wrap: nowrap;
+    }
+
+    .action-btns a, .action-btns button {
+      cursor: pointer;
+      transition: transform 0.15s ease;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: none;
+      background: none;
+      padding: 0;
+      color: inherit;
+    }
+    .action-btns a:hover, .action-btns button:hover {
+      transform: scale(1.2);
+    }
+
+    .action-btns img {
+      width: 24px;
+      height: 24px;
+      display: block;
+    }
+
+    @media (max-width: 640px) {
+      h1 {
+        font-size: 1.75rem;
+      }
+      #exportBtn, label[for="importInput"] {
+        font-size: 0.875rem;
+        padding: 0.5rem 0.75rem;
+      }
+      th, td {
+        padding: 8px 8px;
+        font-size: 0.75rem;
+      }
+      .action-btns {
+        gap: 8px;
+      }
+      .action-btns img {
+        width: 20px;
+        height: 20px;
+      }
+      .btn-nav-container a {
+        font-size: 0.875rem;
+        padding: 0.5rem 0;
+      }
+      table {
+        min-width: unset;
+      }
+    }
+  </style>
+</head>
+<body class="bg-gray-50 m-0 p-0">
+
+  <!-- Header container -->
+  <div id="header-container" class="sticky top-0 bg-white z-50 shadow-md"></div>
+
+  <main>
+
+    <h1 class="text-3xl font-bold text-center mb-6">View Transactions</h1>
+
+    <!-- Export / Import Buttons -->
+    <div class="flex flex-wrap gap-4 mb-10">
+      <button id="exportBtn" title="Export CSV" aria-label="Export transactions as CSV">
+        <img src="icons/download.svg" alt="" />
+        Export
+      </button>
+
+      <label for="importInput" title="Import CSV" aria-label="Import transactions from CSV">
+        <img src="icons/upload.svg" alt="" />
+        Import
+      </label>
+      <input type="file" id="importInput" accept=".csv" class="hidden" />
+    </div>
+
+    <!-- Table Container -->
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Bank</th>
+            <th>Method</th>
+            <th>Amount (₹)</th>
+            <th>Notes</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="transactionsTableBody" class="divide-y divide-gray-100">
+          <!-- Transactions will be loaded here -->
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Buttons Container -->
+    <div class="btn-nav-container">
+      <a href="index.html" title="Back to Dashboard">← Back</a>
+      <a href="Add_Transaction.html" title="Add new transaction">+ Add Transaction</a>
+    </div>
+  </main>
+
+  <script>
+    // Load external header HTML into #header-container
+    fetch('./Header.html')
+      .then(res => res.text())
+      .then(data => {
+        document.getElementById('header-container').innerHTML = data;
+
+        // Sidebar toggle if exists
+        const menuToggle = document.getElementById('menuToggle');
+        const sidebarMenu = document.getElementById('sidebarMenu');
+        if (menuToggle && sidebarMenu) {
+          menuToggle.addEventListener('click', () => {
+            sidebarMenu.classList.toggle('hidden');
+          });
+        }
+        highlightSidebarItem();
+      });
+
+    function highlightSidebarItem() {
+      const sidebarMenu = document.getElementById('sidebarMenu');
+      if (!sidebarMenu) return;
+      const currentPage = window.location.pathname.split('/').pop();
+      sidebarMenu.querySelectorAll('a').forEach(link => {
+        link.classList.remove('text-yellow-400', 'font-semibold');
+        if (link.getAttribute('href') === currentPage) {
+          link.classList.add('text-yellow-400', 'font-semibold');
+        }
+      });
+    }
+
+    // Load transactions from localStorage and render the table
+    function loadTransactions() {
+      const tbody = document.getElementById('transactionsTableBody');
+      tbody.innerHTML = '';
+      const transactions = JSON.parse(localStorage.getItem('transactions')) || [];
+
+      if (transactions.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" class="py-6 text-gray-400">No transactions found.</td></tr>`;
+        return;
+      }
+
+      transactions.forEach((tx, index) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${tx.date || ''}</td>
+          <td>${tx.bank || ''}</td>
+          <td>${tx.method || ''}</td>
+          <td class="text-right">${parseFloat(tx.amount).toFixed(2)}</td>
+          <td>${tx.notes || ''}</td>
+          <td>
+            <div class="action-btns">
+              <a href="Edit_Transaction.html?id=${index}" title="Edit Transaction" aria-label="Edit Transaction">
+                <img src="icons/edit.svg" alt="Edit" />
+              </a>
+              <button title="Delete Transaction" aria-label="Delete Transaction" onclick="deleteTransaction(${index})">
+                <img src="icons/delete.svg" alt="Delete" />
+              </button>
+            </div>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // Delete transaction and update bank balance accordingly
+    function deleteTransaction(index) {
+      if (!confirm('Are you sure you want to delete this transaction?')) return;
+
+      let transactions = JSON.parse(localStorage.getItem('transactions')) || [];
+      let banks = JSON.parse(localStorage.getItem('banks')) || {};
+
+      const tx = transactions[index];
+      if (!tx) return;
+
+      // Update bank balance: add back the amount because deleting expense increases balance
+      const bankName = tx.bank;
+      const amount = parseFloat(tx.amount);
+      if (banks[bankName] !== undefined && !isNaN(amount)) {
+        banks[bankName] = (parseFloat(banks[bankName]) + amount).toFixed(2);
+      }
+
+      // Remove transaction
+      transactions.splice(index, 1);
+
+      // Save updated data
+      localStorage.setItem('transactions', JSON.stringify(transactions));
+      localStorage.setItem('banks', JSON.stringify(banks));
+
+      alert('Transaction deleted and bank balance updated.');
+
+      loadTransactions();
+    }
+
+    // Export transactions as CSV
+    document.getElementById('exportBtn').addEventListener('click', () => {
+      const transactions = JSON.parse(localStorage.getItem('transactions')) || [];
+      if (transactions.length === 0) {
+        alert('No transactions to export.');
+        return;
+      }
+
+      // CSV header (match table columns)
+      const headers = ['Date', 'Bank', 'Method', 'Amount', 'Notes'];
+      const rows = transactions.map(tx => [
+        tx.date, tx.bank, tx.method, tx.amount, tx.notes
+      ]);
+
+      let csvContent = 'data:text/csv;charset=utf-8,';
+      csvContent += headers.join(',') + '\r\n';
+      rows.forEach(row => {
+        // Escape commas & quotes in data
+        const escapedRow = row.map(cell => `"${(cell || '').toString().replace(/"/g, '""')}"`);
+        csvContent += escapedRow.join(',') + '\r\n';
+      });
+
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement('a');
+      link.setAttribute('href', encodedUri);
+      link.setAttribute('download', 'zentry_transactions.csv');
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    });
+
+    // Import transactions from CSV
+    document.getElementById('importInput').addEventListener('change', function (event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        const text = e.target.result;
+        const parsedTransactions = parseCSV(text);
+        if (parsedTransactions.length === 0) {
+          alert('No valid transactions found in the CSV.');
+          return;
+        }
+
+        // Merge imported transactions with existing, replacing duplicates (optional: here just append)
+        const existingTransactions = JSON.parse(localStorage.getItem('transactions')) || [];
+        const merged = existingTransactions.concat(parsedTransactions);
+
+        localStorage.setItem('transactions', JSON.stringify(merged));
+        alert(`${parsedTransactions.length} transactions imported successfully.`);
+
+        // Clear input
+        event.target.value = '';
+        loadTransactions();
+      };
+      reader.readAsText(file);
+    });
+
+    // Simple CSV parser for expected format with headers: Date,Bank,Method,Amount,Notes
+    function parseCSV(csvText) {
+      const lines = csvText.trim().split(/\r?\n/);
+      if (lines.length < 2) return [];
+
+      // Extract headers
+      const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+      const expectedHeaders = ['date', 'bank', 'method', 'amount', 'notes'];
+      // Check headers - lenient
+      if (!expectedHeaders.every(h => headers.includes(h))) return [];
+
+      // Map header index for flexible order
+      const headerIndex = {};
+      headers.forEach((h, i) => headerIndex[h] = i);
+
+      const transactions = [];
+
+      for (let i = 1; i < lines.length; i++) {
+        if (!lines[i].trim()) continue;
+        const cells = lines[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(c => c.trim().replace(/^"|"$/g, ''));
+        if (cells.length < headers.length) continue;
+
+        // Validate amount numeric
+        const amountNum = parseFloat(cells[headerIndex['amount']]);
+        if (isNaN(amountNum)) continue;
+
+        transactions.push({
+          date: cells[headerIndex['date']] || '',
+          bank: cells[headerIndex['bank']] || '',
+          method: cells[headerIndex['method']] || '',
+          amount: amountNum.toFixed(2),
+          notes: cells[headerIndex['notes']] || ''
+        });
+      }
+
+      return transactions;
+    }
+
+    // Initial load
+    loadTransactions();
+  </script>
+</body>
+</html>
